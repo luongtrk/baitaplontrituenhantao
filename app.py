@@ -99,6 +99,8 @@ app.add_middleware(
 
 if os.path.isdir(OUTPUTS_DIR):
     app.mount("/outputs", StaticFiles(directory=OUTPUTS_DIR), name="outputs")
+if os.path.isdir("data"):
+    app.mount("/data", StaticFiles(directory="data"), name="data")
 
 FEATURE_LABELS_VI = {
     "temperature_2m": "Nhiệt độ không khí (°C)",
