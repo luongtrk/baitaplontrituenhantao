@@ -1,0 +1,73 @@
+{
+  "dataset": {
+    "total_rows": 17544,
+    "train_rows": 12280,
+    "val_rows": 2632,
+    "test_rows": 2632,
+    "start_time": "2024-01-01 00:00:00",
+    "end_time": "2025-12-31 23:00:00",
+    "lookback_hours": 168,
+    "horizon_hours": 24
+  },
+  "regression": {
+    "baseline_linear": {
+      "temperature_2m": {
+        "mae": 0.8808,
+        "rmse": 1.3094,
+        "r2": 0.8658
+      },
+      "relative_humidity_2m": {
+        "mae": 5.0587,
+        "rmse": 6.6878,
+        "r2": 0.6827
+      },
+      "wind_speed_10m": {
+        "mae": 3.7294,
+        "rmse": 5.0349,
+        "r2": 0.2829
+      },
+      "temp_t1h": {
+        "mae": 0.2972,
+        "rmse": 0.4129,
+        "r2": 0.9868
+      }
+    },
+    "lstm": {
+      "temperature_2m": {
+        "mae": 0.9745,
+        "rmse": 1.407,
+        "r2": 0.8451
+      },
+      "relative_humidity_2m": {
+        "mae": 5.4277,
+        "rmse": 7.0981,
+        "r2": 0.6426
+      },
+      "wind_speed_10m": {
+        "mae": 3.9241,
+        "rmse": 5.2584,
+        "r2": 0.2178
+      },
+      "temp_t1h": {
+        "mae": 0.6731,
+        "rmse": 0.8988,
+        "r2": 0.9377
+      }
+    },
+    "lstm_train_seconds": 161.9,
+    "lstm_inference_ms": 0.64,
+    "epochs_trained": 18
+  },
+  "classification": {
+    "xgboost": {
+      "accuracy": 99.77,
+      "f1_weighted": 99.78,
+      "f1_macro": 96.43
+    },
+    "random_forest": {
+      "accuracy": 99.96,
+      "f1_weighted": 99.96,
+      "f1_macro": 99.39
+    }
+  }
+}

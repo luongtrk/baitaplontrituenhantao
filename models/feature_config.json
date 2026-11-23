@@ -1,0 +1,46 @@
+{
+  "lstm_features": [
+    "temperature_2m",
+    "relative_humidity_2m",
+    "surface_pressure",
+    "wind_speed_10m",
+    "wind_gusts_10m",
+    "precipitation",
+    "pm2_5",
+    "us_aqi",
+    "hour_sin",
+    "hour_cos",
+    "month_sin",
+    "month_cos",
+    "wind_u",
+    "wind_v"
+  ],
+  "target_cols": [
+    "temperature_2m",
+    "relative_humidity_2m",
+    "wind_speed_10m"
+  ],
+  "clf_features": [
+    "temperature_2m",
+    "relative_humidity_2m",
+    "surface_pressure",
+    "wind_speed_10m",
+    "wind_gusts_10m",
+    "precipitation",
+    "cloud_cover",
+    "pm2_5",
+    "pm10",
+    "us_aqi",
+    "hour_sin",
+    "hour_cos",
+    "month_sin",
+    "month_cos",
+    "temp_diff_3h",
+    "pressure_diff_3h",
+    "humidity_diff_3h",
+    "precip_sum_6h",
+    "wind_mean_6h"
+  ],
+  "lookback_hours": 168,
+  "horizon_hours": 24
+}
