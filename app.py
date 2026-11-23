@@ -21,6 +21,8 @@ import requests
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 from tensorflow import keras
 
 from src.beaufort import (
@@ -94,6 +96,43 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+if os.path.isdir(OUTPUTS_DIR):
+    app.mount("/outputs", StaticFiles(directory=OUTPUTS_DIR), name="outputs")
+
+FEATURE_LABELS_VI = {
+    "temperature_2m": "Nhiệt độ không khí (°C)",
+    "relative_humidity_2m": "Độ ẩm tương đối (%)",
+    "surface_pressure": "Áp suất bề mặt (hPa)",
+    "wind_speed_10m": "Tốc độ gió (km/h)",
+    "wind_gusts_10m": "Gió giật tối đa (km/h)",
+    "precipitation": "Lượng mưa hiện tại (mm/h)",
+    "cloud_cover": "Độ che phủ mây (%)",
+    "pm2_5": "Bụi mịn PM2.5",
+    "pm10": "Bụi mịn PM10",
+    "us_aqi": "Chỉ số không khí AQI",
+    "hour_sin": "Chu kỳ giờ (sin)",
+    "hour_cos": "Chu kỳ giờ (cos)",
+    "month_sin": "Chu kỳ mùa (sin)",
+    "month_cos": "Chu kỳ mùa (cos)",
+    "temp_diff_3h": "Biến động nhiệt độ 3h",
+    "pressure_diff_3h": "Biến động áp suất 3h",
+    "humidity_diff_3h": "Biến động độ ẩm 3h",
+    "precip_sum_6h": "Tổng lượng mưa 6h",
+    "wind_mean_6h": "Gió trung bình 6h",
+}
+
+
+class SimulationInput(BaseModel):
+    temperature_2m: float = 28.0
+    relative_humidity_2m: float = 78.0
+    surface_pressure: float = 1012.0
+    wind_speed_10m: float = 24.0
+    wind_gusts_10m: float = 34.0
+    precipitation: float = 0.0
+    cloud_cover: float = 40.0
+    pressure_diff_3h: float = 0.0
+    us_aqi: float = 50.0
 
 # Bộ nhớ đệm mô hình AI
 MODEL_CACHE: Dict[str, Any] = {}
@@ -376,6 +415,92 @@ def get_metrics():
         return JSONResponse(status_code=404, content={"error": "Chua co file model_metrics.json"})
     with open(metrics_path, "r", encoding="utf-8") as f:
         return JSONResponse(content=json.load(f))
+
+
+@app.get("/api/explain")
+def get_explainability():
+    """Giải thích mô hình AI (Explainable AI) dựa trên Feature Importance của XGBoost."""
+    try:
+        load_models()
+        xgb = MODEL_CACHE["xgb"]
+        importances = xgb.feature_importances_
+        total = float(np.sum(importances)) or 1.0
+        items = []
+        for feat, imp in zip(CLF_FEATURES, importances):
+            items.append({
+                "feature": feat,
+                "label": FEATURE_LABELS_VI.get(feat, feat),
+                "importance": round(float(imp) / total * 100.0, 2),
+            })
+        items.sort(key=lambda x: x["importance"], reverse=True)
+        return JSONResponse(content={
+            "model": "XGBoost Classifier (4 lớp trạng thái)",
+            "top_features": items[:8],
+            "all_features": items,
+        })
+    except Exception as exc:
+        return JSONResponse(status_code=500, content={"error": str(exc)})
+
+
+@app.post("/api/simulate")
+def simulate_scenario(inp: SimulationInput):
+    """Bộ mô phỏng What-If: chạy suy luận trực tiếp trên XGBoost & Thang Beaufort."""
+    try:
+        load_models()
+        now = datetime.now()
+        hour_sin = float(np.sin(2 * np.pi * now.hour / 24.0))
+        hour_cos = float(np.cos(2 * np.pi * now.hour / 24.0))
+        month_sin = float(np.sin(2 * np.pi * now.month / 12.0))
+        month_cos = float(np.cos(2 * np.pi * now.month / 12.0))
+
+        row = {
+            "temperature_2m": inp.temperature_2m,
+            "relative_humidity_2m": inp.relative_humidity_2m,
+            "surface_pressure": inp.surface_pressure,
+            "wind_speed_10m": inp.wind_speed_10m,
+            "wind_gusts_10m": max(inp.wind_gusts_10m, inp.wind_speed_10m * 1.25),
+            "precipitation": inp.precipitation,
+            "cloud_cover": inp.cloud_cover,
+            "pm2_5": max(5.0, inp.us_aqi * 0.4),
+            "pm10": max(10.0, inp.us_aqi * 0.65),
+            "us_aqi": inp.us_aqi,
+            "hour_sin": hour_sin,
+            "hour_cos": hour_cos,
+            "month_sin": month_sin,
+            "month_cos": month_cos,
+            "temp_diff_3h": -2.5 if inp.precipitation >= 10 else 0.2,
+            "pressure_diff_3h": inp.pressure_diff_3h,
+            "humidity_diff_3h": 8.0 if inp.precipitation >= 5 else 0.0,
+            "precip_sum_6h": inp.precipitation * 3.0,
+            "wind_mean_6h": inp.wind_speed_10m * 0.9,
+        }
+
+        X_sim = np.array([[row[c] for c in CLF_FEATURES]], dtype=np.float32)
+        probs = MODEL_CACHE["xgb"].predict_proba(X_sim)[0]
+        pred_idx = int(np.argmax(probs))
+        label_info = WEATHER_LABELS[pred_idx]
+        beaufort = wind_speed_to_beaufort(max(inp.wind_speed_10m, inp.wind_gusts_10m * 0.75))
+
+        return JSONResponse(content={
+            "predicted_class": pred_idx,
+            "label": label_info["name"],
+            "icon": label_info["icon"],
+            "color": label_info["color"],
+            "risk": label_info["risk"],
+            "confidence": round(float(probs[pred_idx]) * 100.0, 1),
+            "probabilities": [
+                {
+                    "class_id": i,
+                    "name": WEATHER_LABELS[i]["name"],
+                    "color": WEATHER_LABELS[i]["color"],
+                    "prob": round(float(probs[i]) * 100.0, 1),
+                }
+                for i in range(4)
+            ],
+            "beaufort": beaufort,
+        })
+    except Exception as exc:
+        return JSONResponse(status_code=500, content={"error": str(exc)})
 
 
 if __name__ == "__main__":
