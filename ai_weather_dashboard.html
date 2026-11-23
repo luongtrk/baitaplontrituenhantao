@@ -836,15 +836,61 @@
 
     .ai-charts-gallery {
       display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 12px;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
     }
 
     .ai-charts-gallery img {
       width: 100%;
+      height: 155px;
+      object-fit: contain;
       border-radius: 10px;
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.12);
       background: #fff;
+      cursor: zoom-in;
+      transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+
+    .ai-charts-gallery img:hover {
+      transform: scale(1.03);
+      border-color: var(--accent-cyan);
+    }
+
+    .lstm-tag {
+      font-size: 0.66rem;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: rgba(114, 237, 242, 0.14);
+      color: var(--accent-cyan);
+      border: 1px solid rgba(114, 237, 242, 0.35);
+      text-transform: none;
+      letter-spacing: 0;
+    }
+
+    .img-lightbox {
+      position: fixed;
+      inset: 0;
+      background: rgba(5, 8, 14, 0.9);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+      padding: 24px;
+      cursor: zoom-out;
+    }
+
+    .img-lightbox.open {
+      display: flex;
+      animation: fadeIn 0.18s ease-out;
+    }
+
+    .img-lightbox img {
+      max-width: 94vw;
+      max-height: 90vh;
+      border-radius: 12px;
+      background: #fff;
+      box-shadow: 0 25px 70px rgba(0, 0, 0, 0.7);
     }
 
     @media (max-width: 780px) {
@@ -1003,6 +1049,7 @@
             <div class="hourly-title">
               <i class="fa-solid fa-chart-line"></i>
               <span id="chartLabel">Diễn biến chuỗi 24 giờ tới</span>
+              <span class="lstm-tag" id="lstmTag">LSTM 24h</span>
             </div>
             <div style="display: flex; gap: 6px;">
               <button class="chart-toggle-btn active" id="btnChartTemp" onclick="toggleMetric('temp')">Nhiệt độ (°C)</button>
@@ -1134,11 +1181,20 @@
         </table>
 
         <div class="ai-charts-gallery">
-          <img src="/outputs/lstm_actual_vs_pred.png" alt="LSTM vs Actual" onerror="this.style.display='none'">
-          <img src="/outputs/confusion_matrix_xgb.png" alt="Confusion Matrix XGBoost" onerror="this.style.display='none'">
+          <img src="/outputs/lstm_actual_vs_pred.png" alt="So khớp Thực tế vs Dự báo LSTM" title="Nhấp để phóng to" onclick="openLightbox(this.src)" onerror="this.style.display='none'">
+          <img src="/outputs/confusion_matrix_xgb.png" alt="Ma trận nhầm lẫn XGBoost" title="Nhấp để phóng to" onclick="openLightbox(this.src)" onerror="this.style.display='none'">
+          <img src="/outputs/eda_correlation.png" alt="Ma trận tương quan các biến khí tượng" title="Nhấp để phóng to" onclick="openLightbox(this.src)" onerror="this.style.display='none'">
+        </div>
+        <div style="font-size:0.72rem; color:var(--text-dim); margin-top:8px; text-align:right;">
+          <i class="fa-solid fa-magnifying-glass-plus"></i> Nhấp vào ảnh biểu đồ để phóng to khi trình chiếu
         </div>
       </div>
     </div>
+  </div>
+
+  <!-- Image Lightbox for Projector Zoom -->
+  <div class="img-lightbox" id="imgLightbox" onclick="this.classList.remove('open')">
+    <img id="lightboxImg" src="" alt="Biểu đồ phóng to">
   </div>
 
   <script>
@@ -2275,6 +2331,10 @@
       document.getElementById("subAqi").innerText = dayData.subAqi;
 
       // 4. Update 24h Hourly Chart for that specific day
+      const lstmTag = document.getElementById("lstmTag");
+      if (lstmTag) {
+        lstmTag.style.display = selectedDayIndex === 0 ? "inline-block" : "none";
+      }
       renderChart();
     }
 
@@ -2390,6 +2450,11 @@
 
     function closeModal(id) {
       document.getElementById(id).classList.remove("open");
+    }
+
+    function openLightbox(src) {
+      document.getElementById("lightboxImg").src = src;
+      document.getElementById("imgLightbox").classList.add("open");
     }
 
     function switchAiTab(tab) {
